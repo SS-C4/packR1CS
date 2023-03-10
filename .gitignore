@@ -1,0 +1,5 @@
+# powers of tau files are too large, download locally
+*.ptau
+
+# node stuff
+node_modules/
