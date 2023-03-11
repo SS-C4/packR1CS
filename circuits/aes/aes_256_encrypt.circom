@@ -14,7 +14,7 @@ template AES256Encrypt()
     var ks_index = 0;
     var s[4][32], t[4][32];
     
-    var i,j,k,l,m;
+    var i,j,k,l,m,gg;
     
     component xor_1[4][32];
 
@@ -34,7 +34,7 @@ template AES256Encrypt()
 
     component xor_2[13][4][3][32];
     component bits2num_1[13][4][4];
-    component num2bits_1[13][4][4];
+    component num2bits_1[13][4][4][4];
     component xor_3[13][4][32];
 
     for(i=0; i<13; i++)
@@ -44,12 +44,13 @@ template AES256Encrypt()
             for(k=0; k<4; k++)
             {
                 bits2num_1[i][j][k] = Bits2Num(8);
-                num2bits_1[i][j][k] = Num2Bits(32);
+                for(gg = 0; gg < 4; gg++) num2bits_1[i][j][k][gg] = Num2Bits(8);
                 var s_tmp[32] = s[(j+k)%4];
                 
                 for(l=0; l<8; l++) bits2num_1[i][j][k].in[l] <== s_tmp[k*8+7-l];
 
-                num2bits_1[i][j][k].in <-- emulated_aesenc_enc_table(k, bits2num_1[i][j][k].out);
+                for(gg = 0; gg < 4; gg++)
+                    num2bits_1[i][j][k][gg].in <-- emulated_table_small(k, bits2num_1[i][j][k].out, gg);
 
                 if(k==0)
                 {
@@ -58,7 +59,7 @@ template AES256Encrypt()
                         for(m=0; m<8; m++)
                         {
                             xor_2[i][j][k][l*8+m] = XOR();
-                            xor_2[i][j][k][l*8+m].a <== num2bits_1[i][j][k].out[l*8+7-m];
+                            xor_2[i][j][k][l*8+m].a <== num2bits_1[i][j][k][(l*8+7-m) >> 3].out[(l*8+7-m) % 8];
                         }
                     }
                 }
@@ -68,7 +69,7 @@ template AES256Encrypt()
                     {
                         for(m=0; m<8; m++)
                         {
-                            xor_2[i][j][k-1][l*8+m].b <== num2bits_1[i][j][k].out[l*8+7-m];
+                            xor_2[i][j][k-1][l*8+m].b <== num2bits_1[i][j][k][(l*8+7-m) >> 3].out[(l*8+7-m) % 8];
 
                             xor_2[i][j][k][l*8+m] = XOR();
                             xor_2[i][j][k][l*8+m].a <== xor_2[i][j][k-1][l*8+m].out;
@@ -81,7 +82,7 @@ template AES256Encrypt()
                     {
                         for(m=0; m<8; m++)
                         {
-                            xor_2[i][j][k-1][l*8+m].b <== num2bits_1[i][j][k].out[l*8+7-m];
+                            xor_2[i][j][k-1][l*8+m].b <== num2bits_1[i][j][k][(l*8+7-m) >> 3].out[(l*8+7-m) % 8];
 
                             xor_3[i][j][l*8+m] = XOR();
                             xor_3[i][j][l*8+m].a <== xor_2[i][j][k-1][l*8+m].out;

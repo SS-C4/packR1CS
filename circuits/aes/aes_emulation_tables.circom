@@ -1,6 +1,12 @@
 // Copyright © 2022, Electron Labs
 pragma circom 2.0.0;
 
+function emulated_table_small(table_num, index, part)
+{
+    var full = emulated_aesenc_enc_table(table_num, index);
+    return ((full >> 8 + part) % 256); 
+}
+
 function emulated_aesenc_enc_table(table_num, index)
 {
     var lut[4][256];

@@ -3,3 +3,6 @@
 
 # node stuff
 node_modules/
+
+# temporary output files
+scripts/.output/
