@@ -1,6 +1,6 @@
 pragma circom 2.0.0;
 
-include "./aes/aes_256_encrypt.circom";
+include "./aes/old_aes_256_encrypt.circom";
 
 template Main(rep)
 {
@@ -19,4 +19,4 @@ template Main(rep)
     }
 }
 
-component main = Main(1000);
+component main = Main(100);
