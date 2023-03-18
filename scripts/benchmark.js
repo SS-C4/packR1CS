@@ -10,8 +10,8 @@ const input_aes_packed = {
 
 //Input for 100x AES
 const input_aes_nopack = {
-	"in": Array.from(Array(25), () => [...Array(128)].map(e=>~~((Math.random() < 0.5) ? 1 : 0))),
-	"ks": Array.from(Array(25), () => [...Array(1920)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
+	"in": Array.from(Array(100), () => [...Array(128)].map(e=>~~((Math.random() < 0.5) ? 1 : 0))),
+	"ks": Array.from(Array(100), () => [...Array(1920)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
 }
 
 
@@ -106,6 +106,22 @@ async function prove() {
 	console.log(`Proving (no pack) took ${endTime_nopack - startTime_nopack} milliseconds`)
 }
 
+async function verify() {
+	console.log('\x1b[32mVerifying... \x1b[0m')
+
+	//Packed version
+	const startTime_packed = performance.now()
+	await asyncExec(`snarkjs groth16 verify ${__dirname}/.output/vkey_packed.json ${__dirname}/.output/proof_packed.json ${__dirname}/.output/input_packed.json`)
+	const endTime_packed = performance.now()
+	console.log(`Verifying (packed) took ${endTime_packed - startTime_packed} milliseconds`)
+
+	//No pack
+	const startTime_nopack = performance.now()
+	await asyncExec(`snarkjs groth16 verify ${__dirname}/.output/vkey_nopack.json ${__dirname}/.output/proof_nopack.json ${__dirname}/.output/input_nopack.json`)
+	const endTime_nopack = performance.now()
+	console.log(`Verifying (no pack) took ${endTime_nopack - startTime_nopack} milliseconds`)
+}
+
 async function main() {
 	// Create ./.output/
 	if (!fs.existsSync(`${__dirname}/.output`)) {
@@ -124,6 +140,7 @@ async function main() {
 	await setup();
 	await generateWitness();
 	await prove();
+	await verify();
 }
 
 main();

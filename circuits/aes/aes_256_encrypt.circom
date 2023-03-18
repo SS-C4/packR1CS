@@ -29,7 +29,7 @@ template AES256Encrypt()
             s[i][j] = xor_1[i][j].out;
         }
     }
-    
+     
     ks_index += 4;
 
     component xor_2[13][4][3][32];
