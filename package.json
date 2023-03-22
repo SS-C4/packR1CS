@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bigint-mod-arith": "^3.1.2",
     "circom_tester": "^0.0.19",
     "circomlib": "^2.0.5",
     "r1csfile": "^0.0.45",
