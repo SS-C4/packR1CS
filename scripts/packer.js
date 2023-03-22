@@ -1,9 +1,10 @@
 const { readR1cs, writeR1cs } = require("r1csfile");
-const { F1Field, Scalar } = require("ffjavascript");
+const { F1Field, Scalar, buildBn128 } = require("ffjavascript");
 const fs = require("fs");
-const { assert, time } = require("console");
+const { assert } = require("console");
 const bigintModArith = require('bigint-mod-arith')
-const { spawn } = require('child_process')
+const { spawn } = require('child_process');
+const { type } = require("os");
 
 
 // Fixed constants
@@ -269,8 +270,14 @@ async function pack(r1cs, symbols) {
     
     await check_r1cs(r1cs, packed_witness);
 
-    // fs.writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input));
-    // fs.writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(packed_witness));
+    const curve = await buildBn128();
+    let packed_input_string = {
+        in: stringifyBigIntsWithField(curve.Fr, packed_input["in"]),
+        ks: stringifyBigIntsWithField(curve.Fr, packed_input["ks"])
+    };
+
+    fs.writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input_string));
+    fs.writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
 }
 
 function stringifyBigIntsWithField(Fr, o) {
