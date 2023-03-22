@@ -40,7 +40,7 @@ const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
 	child.on('exit', () => resolve([stdout, stderr]));
 })
 
-//Reads the r1cs file and the sym file of the subcircuit
+/** Reads the r1cs file and the sym file of the subcircuit */
 async function read_files() {
     if (!fs.existsSync("./.output/subcircuit.r1cs") || !fs.existsSync("./.output/subcircuit.sym")) {
         console.log("Compile subcircuit first");
@@ -70,6 +70,7 @@ async function read_files() {
     return [r1cs, symbols];
 }
 
+/** Generates random inputs and computes witnesses for "pf" subcircuits */
 async function get_input_witness() {
     let input_array = [];
     for (let i = 0; i < pf; i++) {
@@ -95,18 +96,43 @@ async function get_input_witness() {
     return [input_array, witness_array];
 }
 
-
-function crt_map(rem_arr, mod_arr = pi){
+/** Chinese Remainder Theorem map */
+function crt_map(rem_arr, mod_arr = pi) {
     return mod_arr.reduce((sum, mod, index) => {
         const p = q / mod;
         return sum + (rem_arr[index] * bigintModArith.modInv(p, mod) * p);
     }, 0n) % q;
 }
 
-async function pack_input_witness() {
-    const [inp_arr, wit_arr] = await get_input_witness();
-    var i,j;
+/** Checks if the constraint system is satisfied */
+async function check_r1cs(r1cs, witness) {
+    const F = r1cs.F;
 
+    for (const t1 of r1cs.constraints) {
+        const a = evalLC(t1[0]);
+        const b = evalLC(t1[1]);
+        const c = evalLC(t1[2]);
+        assert (F.isZero(F.sub(F.mul(a,b), c)), `Oops ${a} ${b} ${c}`);
+    }
+
+    function evalLC(lc) {
+        let v = F.zero;
+        for (let w in lc) {
+            v = F.add(
+                v,
+                F.mul( lc[w], witness[w])
+            );
+        }
+        return v;
+    }
+}
+
+/** Main packing function */
+async function pack(r1cs, symbols) {
+    //Get the inputs and witnesses for each of the "pf" subcircuits
+    const [inp_arr, wit_arr] = await get_input_witness();
+
+    //Pack the inputs and witnesses for just the subcircuit
     const packed_input = {
         "in": [],
         "ks": []
@@ -140,30 +166,11 @@ async function pack_input_witness() {
         packed_witness.push(crt_map(tmp_arr));
     }
 
-    return [packed_input, packed_witness]
-}
-
-async function write_packed(r1cs){
-    [packed_input, packed_witness] = await pack_input_witness();
-
-    const [oldr1cs, oldsymbols] = await read_files();
-
+    //Add the extra constraints and witness variables to the R1CS and symbol file
+    //Simultaniously, add extra witnesses
     const F = r1cs.F;
 
-    for (const t1 of oldr1cs.constraints) {
-        const a = evalLC(t1[0]);
-        const b = evalLC(t1[1]);
-        const c = evalLC(t1[2]);
-
-        const kq = F.sub(F.mul(a,b), c);
-        // console.log(kq);
-        assert (kq % q == 0n || (p-kq) % q == 0n);
-        const k = (kq % q == 0n) ? (kq / q) : ((p-kq) / q);
-        // console.log(t1);
-
-        packed_witness.push(k);
-    }
-
+    //Function to evaluate a linear combination
     function evalLC(lc) {
         let v = F.zero;
         for (let w in lc) {
@@ -174,89 +181,120 @@ async function write_packed(r1cs){
         }
         return v;
     }
-    
 
-    //Add PoSO values
-
-    //Add PoSO bit values
-
-    // fs.writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input));
-    // fs.writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(packed_witness));
-}
-
-async function add_k(r1cs, symbols) {    
-    counter = 0;
-    
+    //Add the extra k's
+    var counter = 0;
     for (const t1 of r1cs.constraints) {
-        t1[2][(counter + r1cs.nLabels).toString()] = q;
-        symbols["k[" + (counter).toString() + "]"] = {labelIdx: counter + r1cs.nLabels, varIdx: r1cs.nVars + counter, componentIdx: 6};
+        //Compute k
+        const a = evalLC(t1[0]);
+        const b = evalLC(t1[1]);
+        const c = evalLC(t1[2]);
+
+        const kq = F.sub(F.mul(a,b), c);
+        assert (kq % q == 0n || (p-kq) % q == 0n, "oh no");
+
+        //Put the correct positive or negative coefficient for k
+        if (kq % q == 0n) {
+            t1[2][(counter + r1cs.nVars).toString()] = q;    
+            const k = kq / q;
+            assert(k*q == kq, "huh");
+            packed_witness.push(k);
+        }
+        else {
+            t1[2][(counter + r1cs.nVars).toString()] = (minus_one * q) % p;
+            const k = (p - kq) / q; 
+            assert(k*q == (p - kq), `huuh ${kq}`);
+            packed_witness.push(k);
+        }
+
+        symbols["k[" + (counter).toString() + "]"] = {labelIdx: counter + r1cs.nLabels, varIdx: r1cs.nVars + counter, componentIdx: 6};     
         counter++;
     }
 
     r1cs.nLabels += counter;
     r1cs.nVars += counter;
 
-    return [r1cs, symbols];
-}
+    let sum = new Array(reps);
 
-async function add_poso(r1cs, symbols) {
-
-    // PoSO constraints
+    //Add PoSO constraints and witnesses
     for (let i = 0; i < reps; i++) {
         let tc = [{},{},{}];
-        tc[2][(r1cs.nLabels + i*(poso_bound+1)).toString()] = minus_one;
+        tc[2][(r1cs.nVars + i*(poso_bound+1)).toString()] = minus_one;
         
+        sum[i] = 0n;
         for (let j = 0; j < r1cs.nVars; j++) {
-            tc[2][(j).toString()] = Math.round(Math.random() * 2**8);
+            tc[2][(j).toString()] = BigInt(Math.round(Math.random() * 2**8));
+
+            //Add the PoSO sum to packed witness
+            sum[i] += tc[2][(j).toString()] * packed_witness[j];
         }
 
         r1cs.constraints.push(tc);
         symbols["PoSO[" + (i).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1), varIdx: r1cs.nVars + i*(poso_bound+1), componentIdx: 6};
     }
 
-    // Bit decomposition constraints
+    //Add Bit decomposition constraints and witnesses
     for (let i = 0; i < reps; i++) {
+        //Add PoSO sum to packed witness
+        packed_witness.push(sum[i]);
+
         for (let j = 1; j <= poso_bound; j++) {
             let tc = [{},{},{}];
 
             tc[0]["0"] = minus_one;
-            tc[0][(r1cs.nLabels + i*(poso_bound+1) + j).toString()] = 1n;
-            tc[1][(r1cs.nLabels + i*(poso_bound+1) + j).toString()] = 1n;
+            tc[0][(r1cs.nVars + i*(poso_bound+1) + j).toString()] = 1n;
+            tc[1][(r1cs.nVars + i*(poso_bound+1) + j).toString()] = 1n;
+
+            //Compute bit decomposition of PoSO value and add to packed witness 
+            packed_witness.push((sum[i] >> BigInt(j-1)) & 1n);
             
             r1cs.constraints.push(tc);
             symbols["PoSO.Bits[" + (i).toString() + "][" + (j).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1) + j, varIdx: r1cs.nVars + i*(poso_bound+1) + j, componentIdx: 6};
         }
     }
 
-    // Recombination constraints
+    //Add recomposition constraints
     for (let i = 0; i < reps; i++) {
         let tc = [{},{},{}];
-        tc[2][(r1cs.nLabels + i*(poso_bound+1)).toString()] = minus_one;
+        tc[2][(r1cs.nVars + i*(poso_bound+1)).toString()] = minus_one;
         for (let j = 1; j <= poso_bound; j++) {
-            tc[2][(r1cs.nLabels + i*(poso_bound+1) + j).toString()] = BigInt(2**(j-1));
+            tc[2][(r1cs.nVars + i*(poso_bound+1) + j).toString()] = BigInt(2**(j-1));
         }            
         r1cs.constraints.push(tc);
     }
 
     r1cs.nConstraints += reps*(1 + poso_bound + 1);
     r1cs.nLabels += reps*(poso_bound + 1);
-    r1cs.nVars += reps*(poso_bound + 1);
+    r1cs.nVars += reps*(poso_bound + 1);    
+    
+    await check_r1cs(r1cs, packed_witness);
 
-    return [r1cs, symbols];
+    // fs.writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input));
+    // fs.writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(packed_witness));
+}
+
+function stringifyBigIntsWithField(Fr, o) {
+    if (o instanceof Uint8Array)  {
+        return Fr.toString(o);
+    } else if (Array.isArray(o)) {
+        return o.map(stringifyBigIntsWithField.bind(null, Fr));
+    } else if (typeof o == "object") {
+        const res = {};
+        const keys = Object.keys(o);
+        keys.forEach( (k) => {
+            res[k] = stringifyBigIntsWithField(Fr, o[k]);
+        });
+        return res;
+    } else if ((typeof(o) == "bigint") || o.eq !== undefined)  {
+        return o.toString(10);
+    } else {
+        return o;
+    }
 }
 
 async function main() {
     const [r1, sym1] = await read_files();
-
-    const [r2, sym2] = await add_k(r1, sym1);
-    const [r3, sym3] = await add_poso(r2, sym2);
-
-    await write_packed(r3);
-
-    // Write r1cs, symbols, packed input and witness
-    // TODO 
-    // write_input_witness(packed_input, packed_witness);
-
+    await pack(r1,sym1);
 }
 
 main();
