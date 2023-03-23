@@ -19,4 +19,4 @@ template Main(rep)
     }
 }
 
-component main = Main(100);
+component main = Main(11);

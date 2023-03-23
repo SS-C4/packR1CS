@@ -1,11 +1,10 @@
-const { readR1cs, writeR1cs } = require("r1csfile");
-const { F1Field, Scalar, buildBn128 } = require("ffjavascript");
-const fs = require("fs");
-const { assert } = require("console");
-const bigintModArith = require('bigint-mod-arith')
-const { spawn } = require('child_process');
-const { type } = require("os");
-
+import { readR1cs, writeR1cs } from "r1csfile";
+import { F1Field, Scalar, buildBn128 } from "ffjavascript";
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { assert } from "console";
+import { modInv } from 'bigint-mod-arith';
+import { spawn } from 'child_process';
+import { witnessFromJSON } from "./write_witness.js";
 
 // Fixed constants
 const pf = 11;
@@ -43,7 +42,7 @@ const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
 
 /** Reads the r1cs file and the sym file of the subcircuit */
 async function read_files() {
-    if (!fs.existsSync("./.output/subcircuit.r1cs") || !fs.existsSync("./.output/subcircuit.sym")) {
+    if (!existsSync("./.output/subcircuit.r1cs") || !existsSync("./.output/subcircuit.sym")) {
         console.log("Compile subcircuit first");
         return [null, null];
     }
@@ -54,10 +53,10 @@ async function read_files() {
         getFieldFromPrime: (p, singlethread) => new F1Field(p)
     });
     
-    const symsStr = await fs.readFileSync("./.output/subcircuit.sym","utf8");
+    const symsStr = await readFileSync("./.output/subcircuit.sym","utf8");
     const lines = symsStr.split("\n");
 
-    symbols = {};
+    let symbols = {};
     for (let i=0; i<lines.length; i++) {
         const arr = lines[i].split(",");
         if (arr.length!=4) continue;
@@ -84,12 +83,12 @@ async function get_input_witness() {
     let witness_array = Array.from(Array(pf), () => []);
 
     for (let i = 0; i < pf; i++) {
-        fs.writeFileSync(`${__dirname}/.output/input${i}.json`, JSON.stringify(input_array[i]));
+        writeFileSync(`./.output/input${i}.json`, JSON.stringify(input_array[i]));
         
-        await asyncExec(`${__dirname}/.output/subcircuit_cpp/subcircuit ${__dirname}/.output/input${i}.json ${__dirname}/.output/witness${i}.wtns`);
-        await asyncExec(`snarkjs wtns export json ${__dirname}/.output/witness${i}.wtns -o \"./.output/witness${i}.json\"`);
+        await asyncExec(`./.output/subcircuit_cpp/subcircuit ./.output/input${i}.json ./.output/witness${i}.wtns`);
+        await asyncExec(`snarkjs wtns export json ./.output/witness${i}.wtns -o \"./.output/witness${i}.json\"`);
 
-        const data = fs.readFileSync(`${__dirname}/.output/witness${i}.json`, 'utf-8') 
+        const data = readFileSync(`./.output/witness${i}.json`, 'utf-8') 
         const obj = JSON.parse(data)
         Object.values(obj).forEach((item) => witness_array[i].push(Scalar.fromString(item)))
     }
@@ -101,7 +100,7 @@ async function get_input_witness() {
 function crt_map(rem_arr, mod_arr = pi) {
     return mod_arr.reduce((sum, mod, index) => {
         const p = q / mod;
-        return sum + (rem_arr[index] * bigintModArith.modInv(p, mod) * p);
+        return sum + (rem_arr[index] * modInv(p, mod) * p);
     }, 0n) % q;
 }
 
@@ -139,18 +138,18 @@ async function pack(r1cs, symbols) {
         "ks": []
     };
 
-    for(i = 0; i < 128; i++){
+    for(let i = 0; i < 128; i++){
         let tmp_arr = [];
 
-        for (j = 0; j < pf; j++)
+        for (let j = 0; j < pf; j++)
             tmp_arr[j] = BigInt(inp_arr[j]["in"][i]);
 
         packed_input["in"].push(crt_map(tmp_arr));
     }
-    for(i = 0; i < 1920; i++){
+    for(let i = 0; i < 1920; i++){
         let tmp_arr = [];
 
-        for (j = 0; j < pf; j++)
+        for (let j = 0; j < pf; j++)
             tmp_arr[j] = BigInt(inp_arr[j]["ks"][i]);
 
         packed_input["ks"].push(crt_map(tmp_arr));
@@ -158,17 +157,17 @@ async function pack(r1cs, symbols) {
 
     let packed_witness = [];
 
-    for(i = 0; i < wit_arr[0].length; i++){
+    for(let i = 0; i < wit_arr[0].length; i++){
         let tmp_arr = [];
 
-        for (j = 0; j < pf; j++)
+        for (let j = 0; j < pf; j++)
             tmp_arr[j] = BigInt(wit_arr[j][i]);
 
         packed_witness.push(crt_map(tmp_arr));
     }
 
     //Add the extra constraints and witness variables to the R1CS and symbol file
-    //Simultaniously, add extra witnesses
+    //Simultaneously, add extra witnesses
     const F = r1cs.F;
 
     //Function to evaluate a linear combination
@@ -209,6 +208,8 @@ async function pack(r1cs, symbols) {
         }
 
         symbols["k[" + (counter).toString() + "]"] = {labelIdx: counter + r1cs.nLabels, varIdx: r1cs.nVars + counter, componentIdx: 6};     
+        r1cs.map[counter + r1cs.nVars] = counter + r1cs.nLabels;
+
         counter++;
     }
 
@@ -232,6 +233,7 @@ async function pack(r1cs, symbols) {
 
         r1cs.constraints.push(tc);
         symbols["PoSO[" + (i).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1), varIdx: r1cs.nVars + i*(poso_bound+1), componentIdx: 6};
+        r1cs.map[r1cs.nVars + i*(poso_bound+1)] = r1cs.nLabels + i*(poso_bound+1);
     }
 
     //Add Bit decomposition constraints and witnesses
@@ -251,6 +253,7 @@ async function pack(r1cs, symbols) {
             
             r1cs.constraints.push(tc);
             symbols["PoSO.Bits[" + (i).toString() + "][" + (j).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1) + j, varIdx: r1cs.nVars + i*(poso_bound+1) + j, componentIdx: 6};
+            r1cs.map[r1cs.nVars + i*(poso_bound+1) + j] = r1cs.nLabels + i*(poso_bound+1) + j;
         }
     }
 
@@ -276,8 +279,12 @@ async function pack(r1cs, symbols) {
         ks: stringifyBigIntsWithField(curve.Fr, packed_input["ks"])
     };
 
-    fs.writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input_string));
-    fs.writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
+    //Write files
+    writeFileSync(`./.output/packed_input.json`, JSON.stringify(packed_input_string));
+    writeFileSync(`./.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
+
+    await writeR1cs("./.output/packed_subcircuit.r1cs", r1cs);
+    await witnessFromJSON("./.output/packed_witness.json", "./.output/packed_witness.wtns");
 }
 
 function stringifyBigIntsWithField(Fr, o) {
@@ -302,6 +309,8 @@ function stringifyBigIntsWithField(Fr, o) {
 async function main() {
     const [r1, sym1] = await read_files();
     await pack(r1,sym1);
+
+    console.log("\x1b[32mDONE\x1b[0m");
 }
 
 main();

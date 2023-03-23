@@ -1,8 +1,8 @@
-const fs = require("fs")
-const { Scalar } = require("ffjavascript")
-const { spawn } = require('child_process')
+import { readFile, existsSync, mkdirSync, writeFileSync } from "fs"
+import { Scalar } from "ffjavascript"
+import { spawn } from 'child_process'
 
-p = Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617")
+const p = Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617")
 
 // Input for AES
 const input_aes = {
@@ -33,9 +33,9 @@ const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
 
 // Check that all entries of the matrices are "small" in absolute value
 async function r1cs_bound_check() {
-    await asyncExec(`snarkjs r1cs export json ${__dirname}/.output/subcircuit.r1cs`)
+    await asyncExec(`snarkjs r1cs export json ./.output/subcircuit.r1cs`)
 
-    fs.readFile(`${__dirname}/.output/subcircuit.json`, 'utf-8', function(err, data){
+    readFile(`./.output/subcircuit.json`, 'utf-8', function(err, data){
         const obj = JSON.parse(data)
         
         var entries = new Set()
@@ -53,12 +53,12 @@ async function r1cs_bound_check() {
 
 // Check that the generated witness values are "small"
 async function witness_bound_check() {
-    await asyncExec(`make -C ${__dirname}/.output/subcircuit_cpp/`)
-    await asyncExec(`${__dirname}/.output/subcircuit_cpp/subcircuit ${__dirname}/.output/input.json ${__dirname}/.output/witness.wtns`)
+    await asyncExec(`make -C ./.output/subcircuit_cpp/`)
+    await asyncExec(`./.output/subcircuit_cpp/subcircuit ./.output/input.json ./.output/witness.wtns`)
 
-    await asyncExec(`snarkjs wtns export json ${__dirname}/.output/witness.wtns -o \"./.output/witness.json\"`)
+    await asyncExec(`snarkjs wtns export json ./.output/witness.wtns -o \"./.output/witness.json\"`)
 
-    fs.readFile(`${__dirname}/.output/witness.json`, 'utf-8', function(err, data){
+    readFile(`./.output/witness.json`, 'utf-8', function(err, data){
         const obj = JSON.parse(data)
 
         var entries = new Set()
@@ -72,17 +72,17 @@ async function witness_bound_check() {
 
 async function main() {
     // Create ./.output/
-    if (!fs.existsSync(`${__dirname}/.output`)) {
-		fs.mkdirSync(`${__dirname}/.output`)
+    if (!existsSync(`./.output`)) {
+		mkdirSync(`./.output`)
 	}
 
     //Write input.json 
     console.log('\x1b[32mComputing input... \x1b[0m')
-    fs.writeFileSync(`${__dirname}/.output/input.json`, JSON.stringify(input_aes))
+    writeFileSync(`./.output/input.json`, JSON.stringify(input_aes))
 
     //Compile circuit (with --O1)
     console.log('\x1b[32mCompiling circuit... \x1b[0m')
-    await asyncExec(`circom ${__dirname}/../circuits/subcircuit.circom --r1cs --c --sym --O1 -o \"${__dirname}/.output\"`,1)
+    await asyncExec(`circom ./../circuits/subcircuit.circom --r1cs --c --sym --O1 -o \"./.output\"`,1)
 
     // Check the maximum absolute values of witness and R1CS matrices A,B,C
     process.stdout.write('\x1b[32mBounds:\x1b[0m\n')
