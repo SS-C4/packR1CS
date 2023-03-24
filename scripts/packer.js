@@ -271,6 +271,7 @@ async function pack(r1cs, symbols) {
     r1cs.nLabels += reps*(poso_bound + 1);
     r1cs.nVars += reps*(poso_bound + 1);    
     
+    //Make sure the constraint system is satisfied by the witness
     await check_r1cs(r1cs, packed_witness);
 
     const curve = await buildBn128();

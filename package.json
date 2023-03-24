@@ -12,6 +12,7 @@
   "dependencies": {
     "bigint-mod-arith": "^3.1.2",
     "circomlib": "^2.0.5",
-    "r1csfile": "^0.0.45"
+    "r1csfile": "^0.0.45",
+    "snarkjs": "^0.6.10"
   }
 }

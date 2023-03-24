@@ -5,6 +5,7 @@ const prime = new Uint32Array([
 	0xF0000001, 0x43E1F593, 0x79B97091,	0x2833E848, 0x8181585D, 0xB85045B6,	0xE131A029, 0x30644E72
 ]);
 
+// Using some code from the witness caluculator given by circom
 /** Takes witness.json as input and outputs a witness.wtns file */
 export async function witnessFromJSON(jsonpath, outpath) {
     let witness_array = [];
