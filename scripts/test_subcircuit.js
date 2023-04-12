@@ -12,7 +12,7 @@ const input_aes = {
 
 // Input for SHA256
 const input_sha = {
-    "in": Array.from(Array(512).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
+    "in": Array.from(Array(1024).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
 }
 
 const bigIntMax = (...args) => args.reduce((m, e) => e > m ? e : m);
@@ -83,7 +83,7 @@ async function main() {
 
     //Write input.json 
     console.log('\x1b[32mComputing input... \x1b[0m')
-    writeFileSync(`./.output/input.json`, JSON.stringify(input_sha))
+    writeFileSync(`./.output/input.json`, JSON.stringify(input_aes))
 
     //Compile circuit (with --O1)
     console.log('\x1b[32mCompiling circuit... \x1b[0m')
