@@ -132,10 +132,10 @@ async function main() {
     console.log('\x1b[32mComputing input_nopack... \x1b[0m')
     writeFileSync(`./.output/input_nopack.json`, JSON.stringify(input_aes_nopack))
 
-	// await compile();
-	// await setup();
-	// await generateWitness();
-	// await prove();
+	await compile();
+	await setup();
+	await generateWitness();
+	await prove();
 	await verify();
 }
 

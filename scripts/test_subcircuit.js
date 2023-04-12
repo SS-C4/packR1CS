@@ -10,6 +10,11 @@ const input_aes = {
 	"ks": Array.from(Array(1920).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
 }
 
+// Input for SHA256
+const input_sha = {
+    "in": Array.from(Array(512).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
+}
+
 const bigIntMax = (...args) => args.reduce((m, e) => e > m ? e : m);
 
 const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
@@ -56,7 +61,7 @@ async function witness_bound_check() {
     await asyncExec(`make -C ./.output/subcircuit_cpp/`)
     await asyncExec(`./.output/subcircuit_cpp/subcircuit ./.output/input.json ./.output/witness.wtns`)
 
-    await asyncExec(`snarkjs wtns export json ./.output/witness.wtns -o \"./.output/witness.json\"`)
+    await asyncExec(`snarkjs wtns export json ./.output/witness.wtns -o \"./.output/witness.json\"`,1)
 
     readFile(`./.output/witness.json`, 'utf-8', function(err, data){
         const obj = JSON.parse(data)
@@ -78,7 +83,7 @@ async function main() {
 
     //Write input.json 
     console.log('\x1b[32mComputing input... \x1b[0m')
-    writeFileSync(`./.output/input.json`, JSON.stringify(input_aes))
+    writeFileSync(`./.output/input.json`, JSON.stringify(input_sha))
 
     //Compile circuit (with --O1)
     console.log('\x1b[32mCompiling circuit... \x1b[0m')
