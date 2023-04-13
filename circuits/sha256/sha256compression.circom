@@ -21,7 +21,7 @@ pragma circom 2.0.0;
 include "constants.circom";
 include "t1.circom";
 include "t2.circom";
-include "../../node_modules/circomlib/circuits/binsum.circom";
+include "sigma.circom";
 include "sigmaplus.circom";
 include "sha256compression_function.circom";
 

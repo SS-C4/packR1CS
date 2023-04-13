@@ -75,8 +75,7 @@ async function get_input_witness() {
     let input_array = [];
     for (let i = 0; i < pf; i++) {
         input_array[i] = {
-        "in": Array.from(Array(128).keys()).map(i => ((Math.random() < 0.5)?1:0).toString()),
-        "ks": Array.from(Array(1920).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
+        "in": Array.from(Array(1024).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
         };
     }
 
@@ -134,25 +133,16 @@ async function pack(r1cs, symbols) {
 
     //Pack the inputs and witnesses for just the subcircuit
     const packed_input = {
-        "in": [],
-        "ks": []
+        "in": []
     };
 
-    for(let i = 0; i < 128; i++){
+    for(let i = 0; i < 1024; i++){
         let tmp_arr = [];
 
         for (let j = 0; j < pf; j++)
             tmp_arr[j] = BigInt(inp_arr[j]["in"][i]);
 
         packed_input["in"].push(crt_map(tmp_arr));
-    }
-    for(let i = 0; i < 1920; i++){
-        let tmp_arr = [];
-
-        for (let j = 0; j < pf; j++)
-            tmp_arr[j] = BigInt(inp_arr[j]["ks"][i]);
-
-        packed_input["ks"].push(crt_map(tmp_arr));
     }
 
     let packed_witness = [];
@@ -276,8 +266,7 @@ async function pack(r1cs, symbols) {
 
     const curve = await buildBn128();
     let packed_input_string = {
-        in: stringifyBigIntsWithField(curve.Fr, packed_input["in"]),
-        ks: stringifyBigIntsWithField(curve.Fr, packed_input["ks"])
+        in: stringifyBigIntsWithField(curve.Fr, packed_input["in"])
     };
 
     //Write files

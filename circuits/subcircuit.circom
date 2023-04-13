@@ -1,5 +1,5 @@
 pragma circom 2.0.0;
 
-include "./aes/aes_256_encrypt.circom";
+include "./sha256/sha256.circom";
 
-component main = AES256Encrypt();
+component main = Sha256(1024);

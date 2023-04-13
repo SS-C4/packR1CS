@@ -1,25 +1,5 @@
-import { spawn } from 'child_process';
 import { readR1cs } from "r1csfile";
 import { F1Field } from "ffjavascript";
-
-const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
-	let stdout = '';
-	let stderr = '';
-	const child = spawn('sh', ['-c', command]);
-	child.stdout.on('data', data => {
-		const output = data.toString();
-		if (out_print == 1)
-            console.log(output);
-		stdout += output;
-	});
-	child.stderr.on('data', data => {
-		const output = data.toString();
-		console.error(output);
-		stderr += output;
-	});
-	child.on('error', reject);
-	child.on('exit', () => resolve([stdout, stderr]));
-})
 
 /** Counts the number of non-zero entries in the input R1CS file */
 async function nonzero_count(file_name) {

@@ -75,3 +75,36 @@ template BigSigma(ra, rb, rc) {
         out[k] <== xor3.out[k];
     }
 }
+
+function nbits(a) {
+    var n = 1;
+    var r = 0;
+    while (n-1<a) {
+        r++;
+        n *= 2;
+    }
+    return r;
+}
+
+template BinSum(n, ops) {
+    var nout = nbits((2**n -1)*ops);
+    signal input in[ops][n];
+    signal output out[nout];
+    
+    var sum;
+    var carry = 0;
+    var i,j;
+
+    for(i=0; i<nout; i++) {
+        sum = 0;
+        for(j=0; j<ops; j++) {
+            sum += (i < n) ? in[j][i] : 0;
+        }
+        sum += carry;
+        carry = sum >> 1;
+        out[i] <-- sum & 1;
+
+        out[i] * (1 - out[i]) === 0;
+    }
+
+}
