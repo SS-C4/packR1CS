@@ -46,7 +46,7 @@ async function compile() {
 	
 	//Baseline with full optimizations
 	const startTime_nopack = performance.now()
-	await asyncExec(`circom ./../circuits/nopack.circom --r1cs --c --sym --O2 -o \"./.output\"`)
+	await asyncExec(`circom ./../circuits/nopack.circom --r1cs --c --sym --O2 -p bls12381 -o \"./.output\"`)
 	const endTime_nopack = performance.now()
 	console.log(`Compilation (no pack) took ${endTime_nopack - startTime_nopack} milliseconds`)
 }
@@ -56,14 +56,14 @@ async function setup() {
 	
 	//Packed version
 	const startTime_packed = performance.now()
-	await asyncExec(`snarkjs groth16 setup ./.output/packed_subcircuit.r1cs ./powersOfTau28_hez_final_21_packed.ptau ./.output/main_packed0.zkey`)
+	await asyncExec(`snarkjs groth16 setup ./.output/packed_subcircuit.r1cs ./pot21_final.ptau ./.output/main_packed0.zkey`)
 	await asyncExec(`snarkjs zkey contribute ./.output/main_packed0.zkey ./.output/main_packed1.zkey --name=\"packed_key\" -v -e=\"pack\"`)
 	await asyncExec(`snarkjs zkey export verificationkey ./.output/main_packed1.zkey ./.output/vkey_packed.json`)
 	const endTime_packed = performance.now()
 
 	//No pack
 	const startTime_nopack = performance.now()
-	await asyncExec(`snarkjs groth16 setup ./.output/nopack.r1cs ./powersOfTau28_hez_final_21_nopack.ptau ./.output/nopack0.zkey`)
+	await asyncExec(`snarkjs groth16 setup ./.output/nopack.r1cs ./pot21_final.ptau ./.output/nopack0.zkey`)
 	await asyncExec(`snarkjs zkey contribute ./.output/nopack0.zkey ./.output/nopack1.zkey --name=\"nopack_key\" -v -e=\"nopack\"`)
 	await asyncExec(`snarkjs zkey export verificationkey ./.output/nopack1.zkey ./.output/vkey_nopack.json`)
 	const endTime_nopack = performance.now()

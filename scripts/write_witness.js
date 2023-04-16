@@ -1,11 +1,14 @@
 import { Scalar } from "ffjavascript";
 import { readFileSync, writeFileSync } from "fs";
 
+// const prime = new Uint32Array([
+// 	0xF0000001, 0x43E1F593, 0x79B97091,	0x2833E848, 0x8181585D, 0xB85045B6,	0xE131A029, 0x30644E72
+// ]);
 const prime = new Uint32Array([
-	0xF0000001, 0x43E1F593, 0x79B97091,	0x2833E848, 0x8181585D, 0xB85045B6,	0xE131A029, 0x30644E72
+    0x00000001, 0xFFFFFFFF, 0xfffe5bfe, 0x53bda402, 0x09a1d805, 0x3339d808, 0x299d7d48,	0x73eda753
 ]);
 
-// Using some code from the witness caluculator given by circom
+// Using some code from the witness calculator given by circom
 /** Takes witness.json as input and outputs a witness.wtns file */
 export async function witnessFromJSON(jsonpath, outpath) {
     let witness_array = [];

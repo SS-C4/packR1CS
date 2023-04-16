@@ -2,7 +2,8 @@ import { readFile, existsSync, mkdirSync, writeFileSync } from "fs"
 import { Scalar } from "ffjavascript"
 import { spawn } from 'child_process'
 
-const p = Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617")
+// const p = Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617")
+const p = Scalar.fromString("52435875175126190479447740508185965837690552500527637822603658699938581184513")
 
 // Input for SHA256
 const input_sha = {
@@ -81,7 +82,7 @@ async function main() {
 
     //Compile circuit (with --O1)
     console.log('\x1b[32mCompiling circuit... \x1b[0m')
-    await asyncExec(`circom ./../circuits/subcircuit.circom --r1cs --c --sym --O1 -o \"./.output\"`,1)
+    await asyncExec(`circom ./../circuits/subcircuit.circom --r1cs --c --sym --O1 -p bls12381 -o \"./.output\"`,1)
 
     // Check the maximum absolute values of witness and R1CS matrices A,B,C
     process.stdout.write('\x1b[32mBounds:\x1b[0m\n')
