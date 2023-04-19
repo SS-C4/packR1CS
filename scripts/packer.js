@@ -1,5 +1,5 @@
 import { readR1cs, writeR1cs } from "r1csfile";
-import { F1Field, Scalar, buildBn128 } from "ffjavascript";
+import { F1Field, Scalar, buildBls12381 } from "ffjavascript";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { assert } from "console";
 import { modInv } from 'bigint-mod-arith';
@@ -267,7 +267,7 @@ async function pack(r1cs, symbols) {
     //Make sure the constraint system is satisfied by the witness
     await check_r1cs(r1cs, packed_witness);
 
-    const curve = await buildBn128();
+    const curve = await buildBls12381();
     let packed_input_string = {
         in: stringifyBigIntsWithField(curve.Fr, packed_input["in"])
     };
