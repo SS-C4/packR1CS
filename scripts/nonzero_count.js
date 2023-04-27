@@ -27,7 +27,7 @@ async function nonzero_count(file_name) {
         nc += Object.keys(t1[2]).length;
     }
 
-    console.log(`nConstraints: ${r1cs.nConstraints}, nVars: ${r1cs.nVars}, nz_A: ${na}, nz_B: ${nb}, nz_C: ${nc}, total_nz: ${na+nb+nc}`);
+    console.log(`${file_name} - nConstraints: ${r1cs.nConstraints}, nVars: ${r1cs.nVars}, nz_A: ${na}, nz_B: ${nb}, nz_C: ${nc}, total_nz: ${na+nb+nc}`);
 }
 
 async function main() {

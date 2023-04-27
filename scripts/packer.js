@@ -7,10 +7,13 @@ import { spawn } from 'child_process';
 import { witnessFromJSON } from "./write_witness.js";
 
 // Fixed constants
-const pf = 11;
-const sec_lambda = 80;
-const reps = 10;
-const poso_bound = 23 + 93;
+const pf = 11; // Number of subcircuits packed in one go
+const total = 44; // Total number of subcircuits in the circuit
+const sec_lambda = 80; // Security parameter
+const poso_size = 2917; // Number of elements in each PoSO check (calculated to make extra reps = 1)
+const reps = 10 + 1; // Number of repetitions of PoSO to get to security parameter (+ is extra due to union bound)
+const poso_bound = 23 + 93; // Number of bits for each PoSO
+
 const pi = [263n, 269n, 271n, 277n, 281n, 283n, 293n, 307n, 311n, 313n, 317n];
 
 //q is bigint product of elements in pi
@@ -44,7 +47,7 @@ const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
 })
 
 /** Reads the r1cs file and the sym file of the subcircuit */
-async function read_files() {
+async function read_init_files() {
     if (!existsSync("./.output/subcircuit.r1cs") || !existsSync("./.output/subcircuit.sym")) {
         console.log("Compile subcircuit first");
         return [null, null];
@@ -129,7 +132,7 @@ async function check_r1cs(r1cs, witness) {
     }
 }
 
-/** Main packing function */
+/** Main packing function for pf subcircuits into one subcircuit */
 async function pack(r1cs, symbols) {
     //Get the inputs and witnesses for each of the "pf" subcircuits
     const [inp_arr, wit_arr] = await get_input_witness();
@@ -139,6 +142,7 @@ async function pack(r1cs, symbols) {
         "in": []
     };
 
+    // 1024 is the number of inputs to the subcircuit
     for(let i = 0; i < 1024; i++){
         let tmp_arr = [];
 
@@ -211,58 +215,66 @@ async function pack(r1cs, symbols) {
 
     let sum = new Array(reps);
 
-    //Add PoSO constraints and witnesses
-    for (let i = 0; i < reps; i++) {
-        let tc = [{},{},{}];
-        tc[2][(r1cs.nVars + i*(poso_bound+1)).toString()] = minus_one;
-        
-        sum[i] = 0n;
-        for (let j = 0; j < r1cs.nVars; j++) {
-            tc[2][(j).toString()] = BigInt(Math.round(Math.random() * 2**8));
+    let num_poso = Math.ceil(r1cs.nVars/poso_size);
+    assert(num_poso == 64);
 
-            //Add the PoSO sum to packed witness
-            sum[i] += tc[2][(j).toString()] * packed_witness[j];
-        }
-
-        r1cs.constraints.push(tc);
-        symbols["PoSO[" + (i).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1), varIdx: r1cs.nVars + i*(poso_bound+1), componentIdx: 6};
-        r1cs.map[r1cs.nVars + i*(poso_bound+1)] = r1cs.nLabels + i*(poso_bound+1);
-    }
-
-    //Add Bit decomposition constraints and witnesses
-    for (let i = 0; i < reps; i++) {
-        //Add PoSO sum to packed witness
-        packed_witness.push(sum[i]);
-
-        for (let j = 1; j <= poso_bound; j++) {
+    for (let k = 0; k < num_poso; k++) {
+        //Add PoSO constraints and witnesses
+        for (let i = 0; i < reps; i++) {
             let tc = [{},{},{}];
-
-            tc[0]["0"] = minus_one;
-            tc[0][(r1cs.nVars + i*(poso_bound+1) + j).toString()] = 1n;
-            tc[1][(r1cs.nVars + i*(poso_bound+1) + j).toString()] = 1n;
-
-            //Compute bit decomposition of PoSO value and add to packed witness 
-            packed_witness.push((sum[i] >> BigInt(j-1)) & 1n);
+            tc[2][(r1cs.nVars + i*(poso_bound+1) + k*reps*(poso_bound+1)).toString()] = minus_one;
             
+            sum[i] = 0n;
+            for (let j = k*(poso_size); j < (k+1)*(poso_size); j++) {
+                if(j >= r1cs.nVars) 
+                    break;
+                
+                tc[2][(j).toString()] = BigInt(Math.round(Math.random() * 2**8));
+
+                //Add the PoSO sum to packed witness
+                sum[i] += tc[2][(j).toString()] * packed_witness[j];
+            }
+
             r1cs.constraints.push(tc);
-            symbols["PoSO.Bits[" + (i).toString() + "][" + (j).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1) + j, varIdx: r1cs.nVars + i*(poso_bound+1) + j, componentIdx: 6};
-            r1cs.map[r1cs.nVars + i*(poso_bound+1) + j] = r1cs.nLabels + i*(poso_bound+1) + j;
+            symbols["PoSO[" + (i + k*reps).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1) + k*reps*(poso_bound+1), varIdx: r1cs.nVars + i*(poso_bound+1) + k*reps*(poso_bound+1), componentIdx: 6};
+            r1cs.map[r1cs.nVars + i*(poso_bound+1) + k*reps*(poso_bound+1)] = r1cs.nLabels + i*(poso_bound+1) + k*reps*(poso_bound+1);
+        }
+
+        //Add Bit decomposition constraints and witnesses
+        for (let i = 0; i < reps; i++) {
+            //Add PoSO sum to packed witness
+            packed_witness.push(sum[i]);
+
+            for (let j = 1; j <= poso_bound; j++) {
+                let tc = [{},{},{}];
+
+                tc[0]["0"] = minus_one;
+                tc[0][(r1cs.nVars + i*(poso_bound+1) + j + k*reps*(poso_bound+1)).toString()] = 1n;
+                tc[1][(r1cs.nVars + i*(poso_bound+1) + j + k*reps*(poso_bound+1)).toString()] = 1n;
+
+                //Compute bit decomposition of PoSO value and add to packed witness 
+                packed_witness.push((sum[i] >> BigInt(j-1)) & 1n);
+                
+                r1cs.constraints.push(tc);
+                symbols["PoSO.Bits[" + (i).toString() + "][" + (j).toString() + "]"] = {labelIdx: r1cs.nLabels + i*(poso_bound+1) + j + k*reps*(poso_bound+1), varIdx: r1cs.nVars + i*(poso_bound+1) + j + k*reps*(poso_bound+1), componentIdx: 6};
+                r1cs.map[r1cs.nVars + i*(poso_bound+1) + j + k*reps*(poso_bound+1)] = r1cs.nLabels + i*(poso_bound+1) + j + k*reps*(poso_bound+1);
+            }
+        }
+
+        //Add recomposition constraints
+        for (let i = 0; i < reps; i++) {
+            let tc = [{},{},{}];
+            tc[2][(r1cs.nVars + i*(poso_bound+1) + k*reps*(poso_bound+1)).toString()] = minus_one;
+            for (let j = 1; j <= poso_bound; j++) {
+                tc[2][(r1cs.nVars + i*(poso_bound+1) + j + k*reps*(poso_bound+1)).toString()] = BigInt(2**(j-1));
+            }            
+            r1cs.constraints.push(tc);
         }
     }
 
-    //Add recomposition constraints
-    for (let i = 0; i < reps; i++) {
-        let tc = [{},{},{}];
-        tc[2][(r1cs.nVars + i*(poso_bound+1)).toString()] = minus_one;
-        for (let j = 1; j <= poso_bound; j++) {
-            tc[2][(r1cs.nVars + i*(poso_bound+1) + j).toString()] = BigInt(2**(j-1));
-        }            
-        r1cs.constraints.push(tc);
-    }
-
-    r1cs.nConstraints += reps*(1 + poso_bound + 1);
-    r1cs.nLabels += reps*(poso_bound + 1);
-    r1cs.nVars += reps*(poso_bound + 1);    
+    r1cs.nConstraints += num_poso*reps*(1 + poso_bound + 1);
+    r1cs.nLabels += num_poso*reps*(poso_bound + 1);
+    r1cs.nVars += num_poso*reps*(poso_bound + 1);    
     
     //Make sure the constraint system is satisfied by the witness
     await check_r1cs(r1cs, packed_witness);
@@ -278,6 +290,17 @@ async function pack(r1cs, symbols) {
 
     await writeR1cs("./.output/packed_subcircuit.r1cs", r1cs);
     await witnessFromJSON("./.output/packed_witness.json", "./.output/packed_witness.wtns");
+}
+
+/** Outer packing function: Packs total/pf many packed subcicuits to make up the total */
+async function outer_pack() {
+    let num_pack = Math.ceil(total/pf);
+
+    const base_r1cs = await readR1cs("./.output/packed_subcircuit.r1cs",{
+        loadConstraints: true,
+        loadMap: true,
+        getFieldFromPrime: (p, singlethread) => new F1Field(p)
+    });
 }
 
 function stringifyBigIntsWithField(Fr, o) {
@@ -300,7 +323,7 @@ function stringifyBigIntsWithField(Fr, o) {
 }
 
 async function main() {
-    const [r1, sym1] = await read_files();
+    const [r1, sym1] = await read_init_files();
     await pack(r1,sym1);
 
     console.log("\x1b[32mDONE\x1b[0m");

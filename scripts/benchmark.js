@@ -1,18 +1,15 @@
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { spawn } from 'child_process';
 import { performance } from 'perf_hooks';
+import { assert } from 'console';
 
 const pf = 11;
-
-//Input for pf AES unpacked
-const input_aes_nopack = {
-	"in": Array.from(Array(pf), () => [...Array(128)].map(e=>~~((Math.random() < 0.5) ? 1 : 0))),
-	"ks": Array.from(Array(pf), () => [...Array(1920)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
-}
+const total = 44;
+assert(total % pf == 0, "total must be a multiple of pf");
 
 //Input for pf SHA unpacked
 const input_sha_nopack = {
-	"in": Array.from(Array(pf), () => [...Array(1024)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
+	"in": Array.from(Array(total), () => [...Array(1024)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
 }
 
 
@@ -56,16 +53,16 @@ async function setup() {
 	
 	//Packed version
 	const startTime_packed = performance.now()
-	await asyncExec(`snarkjs groth16 setup ./.output/packed_subcircuit.r1cs ./pot21_final.ptau ./.output/main_packed0.zkey`)
-	await asyncExec(`snarkjs zkey contribute ./.output/main_packed0.zkey ./.output/main_packed1.zkey --name=\"packed_key\" -v -e=\"pack\"`)
-	await asyncExec(`snarkjs zkey export verificationkey ./.output/main_packed1.zkey ./.output/vkey_packed.json`)
+	await asyncExec(`snarkjs groth16 setup ./.output/packed_subcircuit.r1cs ./pot23_final.ptau ./.output/main_packed0.zkey`,1)
+	await asyncExec(`snarkjs zkey contribute ./.output/main_packed0.zkey ./.output/main_packed1.zkey --name=\"packed_key\" -v -e=\"pack\"`,1)
+	await asyncExec(`snarkjs zkey export verificationkey ./.output/main_packed1.zkey ./.output/vkey_packed.json`,1)
 	const endTime_packed = performance.now()
 
 	//No pack
 	const startTime_nopack = performance.now()
-	await asyncExec(`snarkjs groth16 setup ./.output/nopack.r1cs ./pot21_final.ptau ./.output/nopack0.zkey`)
-	await asyncExec(`snarkjs zkey contribute ./.output/nopack0.zkey ./.output/nopack1.zkey --name=\"nopack_key\" -v -e=\"nopack\"`)
-	await asyncExec(`snarkjs zkey export verificationkey ./.output/nopack1.zkey ./.output/vkey_nopack.json`)
+	await asyncExec(`snarkjs groth16 setup ./.output/nopack.r1cs ./pot23_final.ptau ./.output/nopack0.zkey`,1)
+	await asyncExec(`snarkjs zkey contribute ./.output/nopack0.zkey ./.output/nopack1.zkey --name=\"nopack_key\" -v -e=\"nopack\"`,1)
+	await asyncExec(`snarkjs zkey export verificationkey ./.output/nopack1.zkey ./.output/vkey_nopack.json`,1)
 	const endTime_nopack = performance.now()
 
 	
