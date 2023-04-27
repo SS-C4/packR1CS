@@ -133,8 +133,8 @@ async function main() {
 	await compile();
 	await setup();
 	await generateWitness();
-	await prove();
-	await verify();
+	// await prove();
+	// await verify();
 }
 
 main();

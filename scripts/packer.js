@@ -12,7 +12,8 @@ const total = 44; // Total number of subcircuits in the circuit
 const sec_lambda = 80; // Security parameter
 const poso_size = 2917; // Number of elements in each PoSO check (calculated to make extra reps = 1)
 const reps = 10 + 1; // Number of repetitions of PoSO to get to security parameter (+ is extra due to union bound)
-const poso_bound = 23 + 93; // Number of bits for each PoSO
+const poso_bound = 23 + 93 - 6; // Number of bits for each PoSO
+const inp_size = 1024 * 4; // Number of bits in each input
 
 const pi = [263n, 269n, 271n, 277n, 281n, 283n, 293n, 307n, 311n, 313n, 317n];
 
@@ -46,20 +47,26 @@ const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
 	child.on('exit', () => resolve([stdout, stderr]));
 })
 
+/** Compiles main_packed to generate necessary files */
+async function compile_main_packed() {
+    await asyncExec(`circom ./../circuits/main_packed.circom --r1cs --c --sym --O1 -p bls12381 -o \"./.output\"`, 1)
+    await asyncExec(`make -C ./.output/main_packed_cpp/`)
+}
+
 /** Reads the r1cs file and the sym file of the subcircuit */
 async function read_init_files() {
-    if (!existsSync("./.output/subcircuit.r1cs") || !existsSync("./.output/subcircuit.sym")) {
-        console.log("Compile subcircuit first");
+    if (!existsSync("./.output/main_packed.r1cs") || !existsSync("./.output/main_packed.sym")) {
+        console.log("Compile main_packed first");
         return [null, null];
     }
 
-    const r1cs = await readR1cs("./.output/subcircuit.r1cs",{
+    const r1cs = await readR1cs("./.output/main_packed.r1cs",{
         loadConstraints: true,
         loadMap: true,
         getFieldFromPrime: (p, singlethread) => new F1Field(p)
     });
     
-    const symsStr = await readFileSync("./.output/subcircuit.sym","utf8");
+    const symsStr = await readFileSync("./.output/main_packed.sym","utf8");
     const lines = symsStr.split("\n");
 
     let symbols = {};
@@ -76,12 +83,12 @@ async function read_init_files() {
     return [r1cs, symbols];
 }
 
-/** Generates random inputs and computes witnesses for "pf" subcircuits */
-async function get_input_witness() {
+/** Generates random inputs and computes witnesses for "pf" subcircuits (input size given) */
+async function get_input_witness(inp_size) {
     let input_array = [];
     for (let i = 0; i < pf; i++) {
         input_array[i] = {
-        "in": Array.from(Array(1024).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
+        "in": Array.from(Array(inp_size).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
         };
     }
 
@@ -90,7 +97,7 @@ async function get_input_witness() {
     for (let i = 0; i < pf; i++) {
         writeFileSync(`./.output/input${i}.json`, JSON.stringify(input_array[i]));
         
-        await asyncExec(`./.output/subcircuit_cpp/subcircuit ./.output/input${i}.json ./.output/witness${i}.wtns`);
+        await asyncExec(`./.output/main_packed_cpp/main_packed ./.output/input${i}.json ./.output/witness${i}.wtns`);
         await asyncExec(`snarkjs wtns export json ./.output/witness${i}.wtns -o \"./.output/witness${i}.json\"`);
 
         const data = readFileSync(`./.output/witness${i}.json`, 'utf-8') 
@@ -133,17 +140,20 @@ async function check_r1cs(r1cs, witness) {
 }
 
 /** Main packing function for pf subcircuits into one subcircuit */
-async function pack(r1cs, symbols) {
-    //Get the inputs and witnesses for each of the "pf" subcircuits
-    const [inp_arr, wit_arr] = await get_input_witness();
+async function pack(r1cs, symbols, poso_rand) {
+    // Check that poso_rand is an array of length poso_size
+    assert(poso_rand.length == poso_size, "poso_rand is not of correct length");
 
-    //Pack the inputs and witnesses for just the subcircuit
+    // Get the inputs and witnesses for each of the "pf" subcircuits
+    const [inp_arr, wit_arr] = await get_input_witness(inp_size);
+
+    // Pack the inputs and witnesses for just the subcircuit
     const packed_input = {
         "in": []
     };
 
     // 1024 is the number of inputs to the subcircuit
-    for(let i = 0; i < 1024; i++){
+    for(let i = 0; i < inp_size; i++){
         let tmp_arr = [];
 
         for (let j = 0; j < pf; j++)
@@ -216,7 +226,7 @@ async function pack(r1cs, symbols) {
     let sum = new Array(reps);
 
     let num_poso = Math.ceil(r1cs.nVars/poso_size);
-    assert(num_poso == 64);
+    assert(num_poso == 64*4);
 
     for (let k = 0; k < num_poso; k++) {
         //Add PoSO constraints and witnesses
@@ -292,17 +302,6 @@ async function pack(r1cs, symbols) {
     await witnessFromJSON("./.output/packed_witness.json", "./.output/packed_witness.wtns");
 }
 
-/** Outer packing function: Packs total/pf many packed subcicuits to make up the total */
-async function outer_pack() {
-    let num_pack = Math.ceil(total/pf);
-
-    const base_r1cs = await readR1cs("./.output/packed_subcircuit.r1cs",{
-        loadConstraints: true,
-        loadMap: true,
-        getFieldFromPrime: (p, singlethread) => new F1Field(p)
-    });
-}
-
 function stringifyBigIntsWithField(Fr, o) {
     if (o instanceof Uint8Array)  {
         return Fr.toString(o);
@@ -323,8 +322,15 @@ function stringifyBigIntsWithField(Fr, o) {
 }
 
 async function main() {
+    await compile_main_packed();
     const [r1, sym1] = await read_init_files();
-    await pack(r1,sym1);
+
+    let poso_rand = [];
+    for (let i = 0; i < poso_size; i++) {
+        poso_rand[i] = BigInt(Math.round(Math.random() * 2**8));
+    }
+
+    await pack(r1,sym1, poso_rand);
 
     console.log("\x1b[32mDONE\x1b[0m");
 }
