@@ -11,20 +11,20 @@ async function nonzero_count(file_name) {
 
     // Matrix A
     let na = 0;
-    for (const t1 of r1cs.constraints) {
-        na += Object.keys(t1[0]).length;
-    } 
+    for (let i = 0; i < r1cs.nConstraints; i++) {
+        na += Object.getOwnPropertyNames(r1cs.constraints[i][0]).length;
+    }
 
     // Matrix B
     let nb = 0;
-    for (const t1 of r1cs.constraints) {
-        nb += Object.keys(t1[1]).length;
+    for (let i = 0; i < r1cs.nConstraints; i++) {
+        nb += Object.getOwnPropertyNames(r1cs.constraints[i][1]).length;
     }
 
     // Matrix C
     let nc = 0;
-    for (const t1 of r1cs.constraints) {
-        nc += Object.keys(t1[2]).length;
+    for (let i = 0; i < r1cs.nConstraints; i++) {
+        nc += Object.getOwnPropertyNames(r1cs.constraints[i][2]).length;
     }
 
     console.log(`${file_name} - nConstraints: ${r1cs.nConstraints}, nVars: ${r1cs.nVars}, nz_A: ${na}, nz_B: ${nb}, nz_C: ${nc}, total_nz: ${na+nb+nc}`);

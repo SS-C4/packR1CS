@@ -9,7 +9,7 @@ assert(total % pf == 0, "total must be a multiple of pf");
 
 //Input for pf SHA unpacked
 const input_sha_nopack = {
-	"in": Array.from(Array(total), () => [...Array(1024)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
+	"in": Array.from(Array(total), () => [...Array(128)].map(e=>~~((Math.random() < 0.5) ? 1 : 0)))
 }
 
 
@@ -53,16 +53,16 @@ async function setup() {
 	
 	//Packed version
 	const startTime_packed = performance.now()
-	await asyncExec(`snarkjs groth16 setup ./.output/packed_subcircuit.r1cs ./pot23_final.ptau ./.output/main_packed0.zkey`,1)
-	await asyncExec(`snarkjs zkey contribute ./.output/main_packed0.zkey ./.output/main_packed1.zkey --name=\"packed_key\" -v -e=\"pack\"`,1)
-	await asyncExec(`snarkjs zkey export verificationkey ./.output/main_packed1.zkey ./.output/vkey_packed.json`,1)
+	await asyncExec(`snarkjs groth16 setup ./.output/packed_subcircuit.r1cs ./pot23_final.ptau ./.output/main_packed0.zkey`)
+	await asyncExec(`snarkjs zkey contribute ./.output/main_packed0.zkey ./.output/main_packed1.zkey --name=\"packed_key\" -v -e=\"pack\"`)
+	await asyncExec(`snarkjs zkey export verificationkey ./.output/main_packed1.zkey ./.output/vkey_packed.json`)
 	const endTime_packed = performance.now()
 
 	//No pack
 	const startTime_nopack = performance.now()
-	await asyncExec(`snarkjs groth16 setup ./.output/nopack.r1cs ./pot23_final.ptau ./.output/nopack0.zkey`,1)
-	await asyncExec(`snarkjs zkey contribute ./.output/nopack0.zkey ./.output/nopack1.zkey --name=\"nopack_key\" -v -e=\"nopack\"`,1)
-	await asyncExec(`snarkjs zkey export verificationkey ./.output/nopack1.zkey ./.output/vkey_nopack.json`,1)
+	await asyncExec(`snarkjs groth16 setup ./.output/nopack.r1cs ./pot23_final.ptau ./.output/nopack0.zkey`)
+	await asyncExec(`snarkjs zkey contribute ./.output/nopack0.zkey ./.output/nopack1.zkey --name=\"nopack_key\" -v -e=\"nopack\"`)
+	await asyncExec(`snarkjs zkey export verificationkey ./.output/nopack1.zkey ./.output/vkey_nopack.json`)
 	const endTime_nopack = performance.now()
 
 	
@@ -83,7 +83,7 @@ async function generateWitness() {
 	//No pack
 	const startTime_nopack = performance.now()
 	await asyncExec(`make -C ./.output/nopack_cpp/`)
-    await asyncExec(`./.output/nopack_cpp/nopack ./.output/nopack_input.json ./.output/nopack_witness.wtns`)
+    await asyncExec(`./.output/nopack_cpp/nopack ./.output/nopack_input.json ./.output/nopack_witness.wtns`, 1)
 	const endTime_nopack = performance.now()
 	console.log(`Generating witness (no pack) took ${endTime_nopack - startTime_nopack} milliseconds`)
 }
@@ -133,7 +133,7 @@ async function main() {
 	await compile();
 	await setup();
 	await generateWitness();
-	// await prove();
+	await prove();
 	// await verify();
 }
 

@@ -7,7 +7,7 @@ const p = Scalar.fromString("524358751751261904794477405081859658376905525005276
 
 // Input for SHA256
 const input_sha = {
-    "in": Array.from(Array(1024).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
+    "in": Array.from(Array(128).keys()).map(i => ((Math.random() < 0.5)?1:0).toString())
 }
 
 const bigIntMax = (...args) => args.reduce((m, e) => e > m ? e : m);

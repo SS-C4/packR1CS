@@ -10,10 +10,10 @@ import { witnessFromJSON } from "./write_witness.js";
 const pf = 11; // Number of subcircuits packed in one go
 const total = 44; // Total number of subcircuits in the circuit
 const sec_lambda = 80; // Security parameter
-const poso_size = 2917; // Number of elements in each PoSO check (calculated to make extra reps = 1)
+let poso_size = 969; // Number of elements in each PoSO check (calculated to make extra reps = 1 <=> poso_size*256 = r1cs.nVars)
 const reps = 10 + 1; // Number of repetitions of PoSO to get to security parameter (+ is extra due to union bound)
 const poso_bound = 23 + 93 - 6; // Number of bits for each PoSO
-const inp_size = 1024 * 4; // Number of bits in each input
+const inp_size = 128 * 4; // Number of bits in each input
 
 const pi = [263n, 269n, 271n, 277n, 281n, 283n, 293n, 307n, 311n, 313n, 317n];
 
@@ -152,7 +152,7 @@ async function pack(r1cs, symbols, poso_rand) {
         "in": []
     };
 
-    // 1024 is the number of inputs to the subcircuit
+    // inp_size is the number of inputs to the subcircuit
     for(let i = 0; i < inp_size; i++){
         let tmp_arr = [];
 
@@ -225,6 +225,7 @@ async function pack(r1cs, symbols, poso_rand) {
 
     let sum = new Array(reps);
 
+    console.log(r1cs.nVars);
     let num_poso = Math.ceil(r1cs.nVars/poso_size);
     assert(num_poso == 64*4);
 
