@@ -84,6 +84,7 @@ async function generateWitness() {
 	const startTime_nopack = performance.now()
 	await asyncExec(`make -C ./.output/nopack_cpp/`)
     await asyncExec(`./.output/nopack_cpp/nopack ./.output/nopack_input.json ./.output/nopack_witness.wtns`, 1)
+	await asyncExec(`snarkjs wtns export json ./.output/nopack_witness.wtns -o \"./.output/nopack_witness.json\"`,1)
 	const endTime_nopack = performance.now()
 	console.log(`Generating witness (no pack) took ${endTime_nopack - startTime_nopack} milliseconds`)
 }
