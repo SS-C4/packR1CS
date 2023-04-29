@@ -1,10 +1,15 @@
 import { readR1cs, writeR1cs } from "r1csfile";
 import { F1Field, Scalar, buildBls12381 } from "ffjavascript";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { assert } from "console";
 import { modInv } from 'bigint-mod-arith';
 import { spawn } from 'child_process';
 import { witnessFromJSON } from "./write_witness.js";
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Fixed constants
 const pf = 11; // Number of subcircuits packed in one go
@@ -49,24 +54,27 @@ const asyncExec = (command,out_print = 0) => new Promise((resolve, reject) => {
 
 /** Compiles main_packed to generate necessary files */
 async function compile_main_packed() {
-    await asyncExec(`circom ./../circuits/main_packed.circom --r1cs --c --sym --O1 -p bls12381 -o \"./.output\"`, 1)
-    await asyncExec(`make -C ./.output/main_packed_cpp/`)
+    if (!existsSync(`${__dirname}/.output`)) {
+		mkdirSync(`${__dirname}/.output`)
+	}
+    await asyncExec(`circom ${__dirname}/../circuits/main_packed.circom --r1cs --c --sym --O1 -p bls12381 -o ${__dirname}/.output`,1)
+    await asyncExec(`make -C ${__dirname}/.output/main_packed_cpp/`)
 }
 
 /** Reads the r1cs file and the sym file of the subcircuit */
 async function read_init_files() {
-    if (!existsSync("./.output/main_packed.r1cs") || !existsSync("./.output/main_packed.sym")) {
+    if (!existsSync(` ${__dirname}/.output/main_packed.r1cs`) || !existsSync(` ${__dirname}/.output/main_packed.sym`)) {
         console.log("Compile main_packed first");
         return [null, null];
     }
 
-    const r1cs = await readR1cs("./.output/main_packed.r1cs",{
+    const r1cs = await readR1cs(`${__dirname}/.output/main_packed.r1cs`,{
         loadConstraints: true,
         loadMap: true,
         getFieldFromPrime: (p, singlethread) => new F1Field(p)
     });
     
-    const symsStr = await readFileSync("./.output/main_packed.sym","utf8");
+    const symsStr = await readFileSync(`${__dirname}/.output/main_packed.sym`,"utf8");
     const lines = symsStr.split("\n");
 
     let symbols = {};
@@ -95,12 +103,12 @@ async function get_input_witness(inp_size) {
     let witness_array = Array.from(Array(pf), () => []);
 
     for (let i = 0; i < pf; i++) {
-        writeFileSync(`./.output/input${i}.json`, JSON.stringify(input_array[i]));
+        writeFileSync(` ${__dirname}/.output/input${i}.json`, JSON.stringify(input_array[i]));
         
-        await asyncExec(`./.output/main_packed_cpp/main_packed ./.output/input${i}.json ./.output/witness${i}.wtns`);
-        await asyncExec(`snarkjs wtns export json ./.output/witness${i}.wtns -o \"./.output/witness${i}.json\"`);
+        await asyncExec(` ${__dirname}/.output/main_packed_cpp/main_packed ${__dirname}/.output/input${i}.json ${__dirname}/.output/witness${i}.wtns`);
+        await asyncExec(`snarkjs wtns export json ${__dirname}/.output/witness${i}.wtns -o \" ${__dirname}/.output/witness${i}.json\"`);
 
-        const data = readFileSync(`./.output/witness${i}.json`, 'utf-8') 
+        const data = readFileSync(` ${__dirname}/.output/witness${i}.json`, 'utf-8') 
         const obj = JSON.parse(data)
         Object.values(obj).forEach((item) => witness_array[i].push(Scalar.fromString(item)))
     }
@@ -225,7 +233,7 @@ async function pack(r1cs, symbols, poso_rand) {
 
     let sum = new Array(reps);
 
-    console.log(r1cs.nVars);
+    // console.log(r1cs.nVars);
     let num_poso = Math.ceil(r1cs.nVars/poso_size);
     assert(num_poso == 64*4);
 
@@ -296,11 +304,11 @@ async function pack(r1cs, symbols, poso_rand) {
     };
 
     //Write files
-    writeFileSync(`./.output/packed_input.json`, JSON.stringify(packed_input_string));
-    writeFileSync(`./.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
+    writeFileSync(` ${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input_string));
+    writeFileSync(` ${__dirname}/.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
 
-    await writeR1cs("./.output/packed_subcircuit.r1cs", r1cs);
-    await witnessFromJSON("./.output/packed_witness.json", "./.output/packed_witness.wtns");
+    await writeR1cs(` ${__dirname}/.output/packed_subcircuit.r1cs`, r1cs);
+    await witnessFromJSON(`${__dirname}/.output/packed_witness.json`, ` ${__dirname}/.output/packed_witness.wtns`);
 }
 
 function stringifyBigIntsWithField(Fr, o) {
@@ -327,13 +335,18 @@ async function main() {
     const [r1, sym1] = await read_init_files();
 
     let poso_rand = [];
+    var args = process.argv.slice(2);
     for (let i = 0; i < poso_size; i++) {
-        poso_rand[i] = BigInt(Math.round(Math.random() * 2**8));
+        if (args[0] == "rand")
+            poso_rand[i] = BigInt(Math.round(Math.random() * 2**8));
+        else
+            poso_rand[i] = BigInt(1);
     }
 
     await pack(r1,sym1, poso_rand);
 
     console.log("\x1b[32mDONE\x1b[0m");
+
 }
 
 main();
