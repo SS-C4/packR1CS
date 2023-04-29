@@ -240,7 +240,7 @@ async function pack(r1cs, symbols, poso_rand) {
                 if(j >= r1cs.nVars) 
                     break;
                 
-                tc[2][(j).toString()] = BigInt(Math.round(Math.random() * 2**8));
+                tc[2][(j).toString()] = poso_rand[j - k*(poso_size)];
 
                 //Add the PoSO sum to packed witness
                 sum[i] += tc[2][(j).toString()] * packed_witness[j];
