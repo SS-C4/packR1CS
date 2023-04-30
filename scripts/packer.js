@@ -337,8 +337,13 @@ async function main() {
     let poso_rand = [];
     var args = process.argv.slice(2);
     for (let i = 0; i < poso_size; i++) {
-        if (args[0] == "rand")
+        if (args[0] == "rand") {
             poso_rand[i] = BigInt(Math.round(Math.random() * 2**8));
+
+            const data = readFileSync(` ${__dirname}/.output/poso_rand.json`, 'utf-8') 
+            const obj = JSON.parse(data)
+            Object.values(obj).forEach((item) => poso_rand[i].push(BigInt(item)))
+        }
         else
             poso_rand[i] = BigInt(1);
     }
