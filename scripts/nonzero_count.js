@@ -31,7 +31,6 @@ async function nonzero_count(file_name) {
 }
 
 async function main() {
-    await nonzero_count("./.output/subcircuit.r1cs");
     await nonzero_count("./.output/nopack.r1cs");
     await nonzero_count("./.output/packed_subcircuit.r1cs");
 }

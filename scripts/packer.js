@@ -63,7 +63,7 @@ async function compile_main_packed() {
 
 /** Reads the r1cs file and the sym file of the subcircuit */
 async function read_init_files() {
-    if (!existsSync(` ${__dirname}/.output/main_packed.r1cs`) || !existsSync(` ${__dirname}/.output/main_packed.sym`)) {
+    if (!existsSync(`${__dirname}/.output/main_packed.r1cs`) || !existsSync(`${__dirname}/.output/main_packed.sym`)) {
         console.log("Compile main_packed first");
         return [null, null];
     }
@@ -103,12 +103,12 @@ async function get_input_witness(inp_size) {
     let witness_array = Array.from(Array(pf), () => []);
 
     for (let i = 0; i < pf; i++) {
-        writeFileSync(` ${__dirname}/.output/input${i}.json`, JSON.stringify(input_array[i]));
+        writeFileSync(`${__dirname}/.output/input${i}.json`, JSON.stringify(input_array[i]));
         
-        await asyncExec(` ${__dirname}/.output/main_packed_cpp/main_packed ${__dirname}/.output/input${i}.json ${__dirname}/.output/witness${i}.wtns`);
-        await asyncExec(`snarkjs wtns export json ${__dirname}/.output/witness${i}.wtns -o \" ${__dirname}/.output/witness${i}.json\"`);
+        await asyncExec(`${__dirname}/.output/main_packed_cpp/main_packed ${__dirname}/.output/input${i}.json ${__dirname}/.output/witness${i}.wtns`);
+        await asyncExec(`snarkjs wtns export json ${__dirname}/.output/witness${i}.wtns -o \"${__dirname}/.output/witness${i}.json\"`);
 
-        const data = readFileSync(` ${__dirname}/.output/witness${i}.json`, 'utf-8') 
+        const data = readFileSync(`${__dirname}/.output/witness${i}.json`, 'utf-8') 
         const obj = JSON.parse(data)
         Object.values(obj).forEach((item) => witness_array[i].push(Scalar.fromString(item)))
     }
@@ -150,7 +150,7 @@ async function check_r1cs(r1cs, witness) {
 /** Main packing function for pf subcircuits into one subcircuit */
 async function pack(r1cs, symbols, poso_rand) {
     // Check that poso_rand is an array of length poso_size
-    assert(poso_rand.length == poso_size, "poso_rand is not of correct length");
+    assert(poso_rand.length == poso_size*reps, "poso_rand is not of correct length");
 
     // Get the inputs and witnesses for each of the "pf" subcircuits
     const [inp_arr, wit_arr] = await get_input_witness(inp_size);
@@ -248,7 +248,7 @@ async function pack(r1cs, symbols, poso_rand) {
                 if(j >= r1cs.nVars) 
                     break;
                 
-                tc[2][(j).toString()] = poso_rand[j - k*(poso_size)];
+                tc[2][(j).toString()] = poso_rand[j - k*(poso_size) + i*poso_size];
 
                 //Add the PoSO sum to packed witness
                 sum[i] += tc[2][(j).toString()] * packed_witness[j];
@@ -304,11 +304,11 @@ async function pack(r1cs, symbols, poso_rand) {
     };
 
     //Write files
-    writeFileSync(` ${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input_string));
-    writeFileSync(` ${__dirname}/.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
+    writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input_string));
+    writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
 
-    await writeR1cs(` ${__dirname}/.output/packed_subcircuit.r1cs`, r1cs);
-    await witnessFromJSON(`${__dirname}/.output/packed_witness.json`, ` ${__dirname}/.output/packed_witness.wtns`);
+    await writeR1cs(`${__dirname}/.output/packed_subcircuit.r1cs`, r1cs);
+    await witnessFromJSON(`${__dirname}/.output/packed_witness.json`, `${__dirname}/.output/packed_witness.wtns`);
 }
 
 function stringifyBigIntsWithField(Fr, o) {
@@ -336,17 +336,16 @@ async function main() {
 
     let poso_rand = [];
     var args = process.argv.slice(2);
-    for (let i = 0; i < poso_size; i++) {
-        if (args[0] == "rand") {
-            poso_rand[i] = BigInt(Math.round(Math.random() * 2**8));
-
-            const data = readFileSync(` ${__dirname}/.output/poso_rand.json`, 'utf-8') 
-            const obj = JSON.parse(data)
-            Object.values(obj).forEach((item) => poso_rand[i].push(BigInt(item)))
-        }
-        else
-            poso_rand[i] = BigInt(1);
+    if (args[0] == "rand") {
+        const data = readFileSync(`${__dirname}/.output/poso_rand.json`, 'utf-8') 
+        const obj = JSON.parse(data)
+        Object.values(obj).forEach((item) => poso_rand.push(BigInt(item)))
     }
+    else 
+        for (let i = 0; i < poso_size*reps; i++) {
+            poso_rand[i] = BigInt(1);
+        }
+    console.log(poso_rand);
 
     await pack(r1,sym1, poso_rand);
 
