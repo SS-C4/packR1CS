@@ -13,12 +13,12 @@ const __dirname = dirname(__filename);
 
 // Fixed constants
 const pf = 11; // Number of subcircuits packed in one go
-const total = 44; // Total number of subcircuits in the circuit
+const total = 11; // Total number of subcircuits in the circuit
 const sec_lambda = 80; // Security parameter
-let poso_size = 969; // Number of elements in each PoSO check (calculated to make extra reps = 1 <=> poso_size*256 = r1cs.nVars)
+let poso_size = 10000; // Number of elements in each PoSO check (calculated to make extra reps = 1 <=> poso_size*256 = r1cs.nVars)
 const reps = 10 + 1; // Number of repetitions of PoSO to get to security parameter (+ is extra due to union bound)
-const poso_bound = 23 + 93 - 6; // Number of bits for each PoSO
-const inp_size = 128 * 4; // Number of bits in each input
+const poso_bound = 23 + 93 - 4; // Number of bits for each PoSO
+const inp_size = 128; // Number of bits in each input
 
 const pi = [263n, 269n, 271n, 277n, 281n, 283n, 293n, 307n, 311n, 313n, 317n];
 
@@ -235,7 +235,7 @@ async function pack(r1cs, symbols, poso_rand) {
 
     // console.log(r1cs.nVars);
     let num_poso = Math.ceil(r1cs.nVars/poso_size);
-    assert(num_poso == 64*4);
+    // assert(num_poso == 64*4);
 
     for (let k = 0; k < num_poso; k++) {
         //Add PoSO constraints and witnesses
@@ -303,7 +303,7 @@ async function pack(r1cs, symbols, poso_rand) {
         in: stringifyBigIntsWithField(curve.Fr, packed_input["in"])
     };
 
-    //Write files
+    // Write files
     writeFileSync(`${__dirname}/.output/packed_input.json`, JSON.stringify(packed_input_string));
     writeFileSync(`${__dirname}/.output/packed_witness.json`, JSON.stringify(stringifyBigIntsWithField(curve.Fr, packed_witness)));
 
@@ -332,6 +332,7 @@ function stringifyBigIntsWithField(Fr, o) {
 
 async function main() {
     await compile_main_packed();
+    
     const [r1, sym1] = await read_init_files();
 
     let poso_rand = [];
@@ -345,11 +346,10 @@ async function main() {
         for (let i = 0; i < poso_size*reps; i++) {
             poso_rand[i] = BigInt(1);
         }
-    console.log(poso_rand);
 
     await pack(r1,sym1, poso_rand);
 
-    console.log("\x1b[32mDONE\x1b[0m");
+    process.exit();
 
 }
 

@@ -4,7 +4,7 @@ import { performance } from 'perf_hooks';
 import { assert } from 'console';
 
 const pf = 11;
-const total = 44;
+const total = 11;
 assert(total % pf == 0, "total must be a multiple of pf");
 
 //Input for pf SHA unpacked
@@ -132,9 +132,9 @@ async function main() {
     writeFileSync(`./.output/nopack_input.json`, JSON.stringify(input_sha_nopack))
 
 	await compile();
-	await setup();
+	// await setup();
 	await generateWitness();
-	await prove();
+	// await prove();
 	// await verify();
 }
 
